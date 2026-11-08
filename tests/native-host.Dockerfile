@@ -1,0 +1,8 @@
+FROM debian:13-slim
+ENV container=docker
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+       systemd systemd-sysv dbus python3 python3-venv ca-certificates curl sudo \
+    && rm -rf /var/lib/apt/lists/*
+STOPSIGNAL SIGRTMIN+3
+CMD ["/sbin/init"]

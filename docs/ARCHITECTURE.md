@@ -27,7 +27,7 @@ flowchart LR
   AI[Future local AI worker] -. advisory events .-> API
 ```
 
-The API serves the compiled frontend. A process lock prevents two service instances sharing the same database. A single scheduler executes at five-second intervals; application mutations and scheduler ticks serialize. A restart never blindly reissues a start command whose outcome is uncertain.
+The API serves the compiled frontend. It can run in Docker or as a native Linux systemd service installed alongside Moonraker. A process lock prevents two service instances sharing the same database. A single scheduler executes at five-second intervals; application mutations and scheduler ticks serialize. A restart never blindly reissues a start command whose outcome is uncertain.
 
 ## Domain and matching
 

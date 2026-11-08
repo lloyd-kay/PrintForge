@@ -35,3 +35,33 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+
+  native-installer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm --prefix frontend ci
+      - run: npm --prefix frontend run build
+      - run: bash -n scripts/install.sh tests/native-install-smoke.sh
+      - run: python3 scripts/build_release.py --output release
+      - name: Build disposable Debian 13 host
+        run: docker build -t printforge-native-test -f tests/native-host.Dockerfile .
+      - name: Test native systemd installation and repeat installation
+        run: |
+          docker run -d --name printforge-native-test --privileged --cgroupns=host \
+            -v /sys/fs/cgroup:/sys/fs/cgroup:rw --tmpfs /run --tmpfs /run/lock --tmpfs /tmp \
+            -v "$PWD/release:/release:ro" -v "$PWD/tests:/tests:ro" printforge-native-test
+          docker exec printforge-native-test bash /tests/native-install-smoke.sh
+      - name: Show installer service logs
+        if: always()
+        run: docker exec printforge-native-test journalctl -u printforge --no-pager -n 100 || true
+      - name: Remove disposable host
+        if: always()
+        run: docker rm -f printforge-native-test || true

@@ -4,6 +4,8 @@ PrintForge is a free, self-hosted dashboard and print queue for Klipper farms. I
 
 ## Run the demo
 
+For a native installation on your Debian 13 Klipper host, use the [one-line installer](docs/INSTALLATION.md). It runs alongside Moonraker without Docker or Node.js and preserves your printer configuration.
+
 From the project directory, with Docker Engine or Docker Desktop and the Compose plugin running:
 
 ```sh

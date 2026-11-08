@@ -14,3 +14,4 @@ frontend/dist/
 data/
 backups/
 *.log
+release/
