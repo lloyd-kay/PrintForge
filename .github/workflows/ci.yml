@@ -61,7 +61,7 @@ jobs:
           docker exec printforge-native-test bash /tests/native-install-smoke.sh
       - name: Show installer service logs
         if: always()
-        run: docker exec printforge-native-test journalctl -u printforge --no-pager -n 100 || true
+        run: docker exec printforge-native-test journalctl -u printforge -u printforge-spoolman --no-pager -n 150 || true
       - name: Remove disposable host
         if: always()
         run: docker rm -f printforge-native-test || true

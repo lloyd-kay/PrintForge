@@ -14,6 +14,17 @@ def valid_http_url(value: str) -> str:
     return value.rstrip('/')
 
 
+class DiscoveryInput(BaseModel):
+    name: str = Field(default='', max_length=100)
+    moonraker_url: str = Field(min_length=1)
+    api_key: str = Field(default='', max_length=512)
+
+    @field_validator('moonraker_url')
+    @classmethod
+    def url(cls, value):
+        return valid_http_url(value)
+
+
 class PrinterInput(BaseModel):
     model_config = ConfigDict(extra='ignore', allow_inf_nan=False)
     name: str = Field(min_length=1, max_length=100)

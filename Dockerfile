@@ -7,7 +7,7 @@ RUN npm run build
 
 FROM python:3.12-slim-bookworm
 LABEL org.opencontainers.image.title="PrintForge" \
-      org.opencontainers.image.version="0.1.0" \
+      org.opencontainers.image.version="0.2.0" \
       org.opencontainers.image.licenses="AGPL-3.0-or-later"
 
 ENV PYTHONDONTWRITEBYTECODE=1 \

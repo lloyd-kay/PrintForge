@@ -10,7 +10,8 @@ from pathlib import Path
 
 REQUIRED = ('app/main.py', 'frontend/dist/index.html', 'requirements-runtime.txt',
             'requirements.lock', 'LICENSE', 'README.md', 'scripts/install.sh',
-            'scripts/native_install.py', 'docs/INSTALLATION.md')
+            'scripts/native_install.py', 'scripts/setup_stack.py', 'scripts/spoolman_setup.py',
+            'scripts/moonraker_setup.py', 'docs/INSTALLATION.md')
 
 
 def build_release(source: Path, output: Path, version: str) -> Path:
@@ -44,7 +45,7 @@ def build_release(source: Path, output: Path, version: str) -> Path:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--version', default='v0.1.0')
+    parser.add_argument('--version', default='v0.2.0')
     parser.add_argument('--output', type=Path, default=Path('release'))
     args = parser.parse_args()
     print(build_release(Path(__file__).resolve().parents[1], args.output, args.version))

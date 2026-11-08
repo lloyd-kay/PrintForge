@@ -17,6 +17,9 @@ def source_tree(tmp_path):
         'LICENSE': 'AGPL', 'README.md': '# PrintForge',
         'scripts/install.sh': '#!/usr/bin/env bash\n',
         'scripts/native_install.py': '# installer\n',
+        'scripts/setup_stack.py': '# stack\n',
+        'scripts/spoolman_setup.py': '# spoolman\n',
+        'scripts/moonraker_setup.py': '# moonraker\n',
         'docs/INSTALLATION.md': '# Install',
     }.items():
         target = source / path
@@ -34,6 +37,9 @@ def test_release_has_compiled_dashboard_and_no_local_secrets(tmp_path):
         names = bundle.getnames()
         assert 'printforge/frontend/dist/index.html' in names
         assert 'printforge/scripts/native_install.py' in names
+        assert 'printforge/scripts/setup_stack.py' in names
+        assert 'printforge/scripts/spoolman_setup.py' in names
+        assert 'printforge/scripts/moonraker_setup.py' in names
         assert 'printforge/.env' not in names
         assert bundle.extractfile('printforge/VERSION').read() == b'v0.1.0\n'
     checksum = hashlib.sha256(archive.read_bytes()).hexdigest()

@@ -1,6 +1,6 @@
 services:
   printforge:
-    image: ${PRINTFORGE_IMAGE:-printforge:0.1.0}
+    image: ${PRINTFORGE_IMAGE:-printforge:0.2.0}
     pull_policy: never
     restart: unless-stopped
     environment:

@@ -1,4 +1,5 @@
 import hashlib
+import math
 import time
 from pathlib import Path
 
@@ -21,6 +22,45 @@ class LiveGateway:
             if 'result' not in body:
                 raise ValueError('Moonraker response has no result')
             return body['result']
+
+    async def discover(self, printer):
+        # Verify credentials before adopting a connection. Metadata is advisory:
+        # travel limits are not necessarily a printable bed (e.g. delta/belt).
+        config = await self.request(printer, 'GET', '/server/config')
+        if not isinstance(config.get('config'), dict):
+            raise ValueError('Moonraker configuration response is invalid')
+        info = await self.request(printer, 'GET', '/server/info')
+        result = {'volume': [0, 0, 0], 'nozzle': 0, 'camera_url': ''}
+        if info.get('klippy_connected'):
+            try:
+                identity = await self.request(printer, 'GET', '/printer/info')
+                result['name'] = str(identity.get('hostname') or 'Discovered Klipper')[:100]
+                query = await self.request(printer, 'POST', '/printer/objects/query', json={'objects': {
+                    'configfile': ['settings'], 'toolhead': ['axis_minimum', 'axis_maximum', 'extruder']}})
+                status = query['status']
+                head = status['toolhead']
+                volume = [float(head['axis_maximum'][i]) - float(head['axis_minimum'][i]) for i in range(3)]
+                if all(math.isfinite(n) and 0 < n <= 10000 for n in volume):
+                    result['volume'] = volume
+                nozzle = float(status['configfile']['settings'][head.get('extruder', 'extruder')]['nozzle_diameter'])
+                if math.isfinite(nozzle) and 0 < nozzle <= 2:
+                    result['nozzle'] = nozzle
+            except (httpx.HTTPError, ValueError, KeyError, TypeError, IndexError):
+                pass
+        try:
+            from .models import valid_http_url
+            cameras = await self.request(printer, 'GET', '/server/webcams/list')
+            for camera in cameras.get('webcams', []):
+                try:
+                    url = valid_http_url(camera.get('stream_url') or '')
+                    if url:
+                        result['camera_url'] = url
+                        break
+                except ValueError:
+                    continue
+        except (httpx.HTTPError, ValueError, KeyError, TypeError):
+            pass
+        return result
 
     async def status(self, printer):
         info = await self.request(printer, 'GET', '/server/info')

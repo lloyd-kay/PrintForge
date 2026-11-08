@@ -83,8 +83,8 @@ The named volume mounts at `/home/app/.local/share/spoolman`. If you replace it 
 1. On the Docker endpoint managed by Portainer, build the image from the source directory:
 
    ```sh
-   docker build -t printforge:0.1.0 .
-   docker image inspect printforge:0.1.0
+   docker build -t printforge:0.2.0 .
+   docker image inspect printforge:0.2.0
    ```
 
    If you built on another machine, use `docker save` and `docker load` to transfer an image for the endpoint’s architecture. The supplied stack uses the local image. For a registry you control, publish it there, set `PRINTFORGE_IMAGE` to its full registry tag, and change the stack’s `pull_policy` to `missing`. There is no published PrintForge image for this delivery. [Portainer’s guidance for external builds](https://docs.portainer.io/faqs/known-issues/docker-compose-files-including-build-steps-fail)

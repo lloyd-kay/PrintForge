@@ -2,7 +2,7 @@ name: printforge
 
 services:
   printforge:
-    image: printforge:0.1.0
+    image: printforge:0.2.0
     build: .
     pull_policy: build
     restart: unless-stopped

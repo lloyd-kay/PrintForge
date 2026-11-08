@@ -8,7 +8,7 @@ from fastapi import HTTPException
 
 from .config import Settings
 from .gateways import DemoGateway, LiveGateway
-from .models import BatchInput, PrinterInput
+from .models import BatchInput, DiscoveryInput, PrinterInput
 from .store import Store
 
 ACTIVE = {'dispatching', 'running', 'needs_attention'}
@@ -117,6 +117,30 @@ class Engine:
             spool['active_reserved_g'] = self.reserved(spool['id'])
         state.update(ai={'enabled': False, 'status': 'Local AI monitoring is planned for a later milestone'}, server_time=now())
         return state
+
+    async def discover_printer(self, data: DiscoveryInput):
+        if self.settings.mode != 'live':
+            fail(400, 'Connection discovery is available in live mode only')
+        async with self.lock:
+            try:
+                metadata = await self.gateway.discover(data.model_dump())
+            except Exception:
+                fail(400, 'Could not verify the Moonraker connection and credentials')
+            printer = next((p for p in self.state['printers'] if p['moonraker_url'].rstrip('/') == data.moonraker_url), None)
+            if printer is not None:
+                if any(j['printer_id'] == printer['id'] and j['state'] in ACTIVE for j in self.state['jobs']):
+                    fail(409, 'Resolve the reserved job before updating connection credentials')
+                printer['api_key'] = data.api_key
+            else:
+                printer = self.base_printer(data.name or metadata.get('name', 'Discovered Klipper'), 'pending-review')
+                printer.update(metadata, moonraker_url=data.moonraker_url, api_key=data.api_key)
+                printer.update(profile='discovered-' + printer['id'][:12], enabled=False, bed_clear=False,
+                               error='Review printer type, travel limits, nozzle, profile and loaded spool before enabling')
+                if data.name:
+                    printer['name'] = data.name
+                self.state['printers'].append(printer)
+            self.save()
+            return next(p for p in self.snapshot()['printers'] if p['id'] == printer['id'])
 
     async def configure_printer(self, data: PrinterInput, printer_id=None):
         async with self.lock:

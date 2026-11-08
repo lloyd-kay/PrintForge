@@ -3,12 +3,13 @@
 set -euo pipefail
 umask 077
 
-version=v0.1.0
+version=v0.2.0
 archive=
 listener=()
 usage() {
     cat <<'HELP'
-Usage: bash install.sh [--version v0.1.0] [--archive FILE] [--port PORT] [--bind IP]
+Usage: bash install.sh [--version v0.2.0] [--archive FILE] [--port PORT] [--bind IP]
+                       [--spoolman-url URL] [--moonraker-data PATH]
 
 Install PrintForge on Debian 12/13 or 64-bit Raspberry Pi OS 12/13 with systemd.
 The first installation listens on 0.0.0.0:8088; subsequent runs preserve the
@@ -16,18 +17,21 @@ listener unless --bind or --port is supplied. Use on a trusted LAN only.
 --archive FILE uses a local release archive and its sibling SHA256SUMS file.
 Downloads use public HTTPS, with your existing GitHub CLI login as a fallback.
 Run as your normal user: sudo is requested only after download and verification.
+Installs/reuses Spoolman and connects accessible local Moonraker instances.
+--spoolman-url reuses your existing inventory. --moonraker-data selects a custom
+Moonraker data directory. Busy/disconnected printers defer configuration.
 HELP
 }
 fail() { printf 'PrintForge installation stopped: %s\n' "$*" >&2; exit 1; }
 while (($#)); do
     case "$1" in
         --help|-h) usage; exit 0 ;;
-        --version|--archive|--port|--bind)
+        --version|--archive|--port|--bind|--spoolman-url|--moonraker-data)
             (($# >= 2)) || fail "$1 needs a value."
             case "$1" in
                 --version) version=$2 ;;
                 --archive) archive=$2 ;;
-                --port|--bind) listener+=("$1" "$2") ;;
+                --port|--bind|--spoolman-url|--moonraker-data) listener+=("$1" "$2") ;;
             esac
             shift 2 ;;
         *) fail "Unknown option: $1 (use --help)." ;;
@@ -112,7 +116,7 @@ except (OSError, ValueError, tarfile.TarError) as exc:
 PY
 )
 python3 "$temp/native_install.py" --extract "$temp/$asset" --destination "$temp/extracted"
-args=(python3 "$temp/native_install.py" --source "$temp/extracted/printforge" \
+args=(python3 "$temp/extracted/printforge/scripts/native_install.py" --source "$temp/extracted/printforge" \
       --version "$version" --digest "$digest" "${listener[@]}")
 if [[ ${EUID:-$(id -u)} == 0 ]]; then
     "${args[@]}"

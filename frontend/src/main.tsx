@@ -281,7 +281,7 @@ function App() {
           <span className="last-update"><Activity size={14} /> Last updated {time(farm.server_time)}</span>
         </div>}
         {content}
-        <footer className="workspace-footer"><span>PRINTFORGE / {health?.version ?? '0.1.0'}</span><span>{demo ? 'SIMULATION' : 'LIVE CONNECTIONS'}</span></footer>
+        <footer className="workspace-footer"><span>PRINTFORGE / {health?.version ?? '0.2.0'}</span><span>{demo ? 'SIMULATION' : 'LIVE CONNECTIONS'}</span></footer>
       </main>
     </div>
     {modal?.type === 'batch' && <Dialog title="Create a batch" description="Each copy is tracked as a separate job." close={close}><BatchForm farm={farm} send={send} close={close} openLibrary={openLibrary} /></Dialog>}

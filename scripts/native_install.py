@@ -392,7 +392,7 @@ WantedBy=multi-user.target
         self.prepare_config()
         self.activate(release, version, bind, port)
         print(f"PrintForge {version} is running on HTTP port {port} (bind {bind}).")
-        print("Use only on your trusted LAN; add printers and Spoolman in the browser.")
+        print("Use only on your trusted LAN. Setting up Spoolman and local Moonraker next.")
         print(f"Administrator token is stored in {self.paths.env} (root-only).")
         print(f"Retrieve locally: sudo sed -n 's/^PRINTFORGE_TOKEN=//p' {self.paths.env}")
         return release
@@ -401,10 +401,12 @@ WantedBy=multi-user.target
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path)
-    parser.add_argument("--version", default="v0.1.0")
+    parser.add_argument("--version", default="v0.2.0")
     parser.add_argument("--digest")
     parser.add_argument("--bind")
     parser.add_argument("--port", type=int)
+    parser.add_argument("--spoolman-url")
+    parser.add_argument("--moonraker-data", type=Path)
     parser.add_argument("--extract", type=Path)
     parser.add_argument("--destination", type=Path)
     args = parser.parse_args(argv)
@@ -431,8 +433,10 @@ def main(argv=None):
             except BlockingIOError as exc:
                 raise InstallError("Another PrintForge installation is already running.") from exc
             Installer().install(args.source, args.version, args.digest, args.bind, args.port)
+            from setup_stack import setup_stack
+            return setup_stack(args.version, spoolman_url=args.spoolman_url, moonraker_data=args.moonraker_data)
         return 0
-    except (InstallError, OSError, ValueError, tarfile.TarError) as exc:
+    except (RuntimeError, OSError, ValueError, tarfile.TarError) as exc:
         print(f"PrintForge installation stopped: {exc}", file=sys.stderr)
         return 1
 

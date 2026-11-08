@@ -12,7 +12,7 @@ from filelock import FileLock, Timeout
 
 from .config import Settings
 from .engine import Engine
-from .models import BatchInput, ControlInput, PrinterInput, ResolveInput, SchedulerInput
+from .models import BatchInput, ControlInput, DiscoveryInput, PrinterInput, ResolveInput, SchedulerInput
 
 
 def create_app(settings: Settings | None = None):
@@ -51,7 +51,7 @@ def create_app(settings: Settings | None = None):
                     await task
             process_lock.release()
 
-    app = FastAPI(title='PrintForge', version='0.1.0', lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
+    app = FastAPI(title='PrintForge', version='0.2.0', lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
     security = HTTPBearer(auto_error=False)
 
     async def auth(credentials: HTTPAuthorizationCredentials | None = Depends(security)):
@@ -63,7 +63,7 @@ def create_app(settings: Settings | None = None):
 
     @app.get('/api/health')
     async def health():
-        return {'status': 'ok', 'mode': settings.mode, 'version': '0.1.0'}
+        return {'status': 'ok', 'mode': settings.mode, 'version': '0.2.0'}
 
     protected = [Depends(auth)]
 
@@ -75,6 +75,10 @@ def create_app(settings: Settings | None = None):
     @app.post('/api/printers', dependencies=protected)
     async def add_printer(data: PrinterInput):
         return await engine().configure_printer(data)
+
+    @app.post('/api/printers/discover', dependencies=protected)
+    async def discover_printer(data: DiscoveryInput):
+        return await engine().discover_printer(data)
 
     @app.put('/api/printers/{printer_id}', dependencies=protected)
     async def edit_printer(printer_id: str, data: PrinterInput):
