@@ -1,0 +1,21 @@
+name: printforge
+
+services:
+  printforge:
+    image: printforge:0.1.0
+    build: .
+    pull_policy: build
+    restart: unless-stopped
+    environment:
+      PRINTFORGE_MODE: ${PRINTFORGE_MODE:-demo}
+      PRINTFORGE_TOKEN: ${PRINTFORGE_TOKEN:-printforge-demo}
+      PRINTFORGE_DATA_DIR: /data
+      PRINTFORGE_POLL_SECONDS: ${PRINTFORGE_POLL_SECONDS:-5}
+      SPOOLMAN_URL: ${SPOOLMAN_URL:-}
+    ports:
+      - "${PRINTFORGE_BIND:-127.0.0.1}:${PRINTFORGE_PORT:-8000}:8000"
+    volumes:
+      - printforge-data:/data
+
+volumes:
+  printforge-data:
