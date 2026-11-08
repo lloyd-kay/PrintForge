@@ -1,6 +1,6 @@
 # MVP API contract (implementation reference)
 
-All `/api/*` except `/api/health` require `Authorization: Bearer <PRINTFORGE_TOKEN>`. Demo default token: `printforge-demo`. Token is kept in browser memory. JSON error: `{detail: string}` (validation errors may be arrays). GET `/api/health`: `{status:'ok',mode:'demo'|'live',version:'0.1.0'}`. GET `/api/state` returns the dashboard document below. UI polls every 5s.
+All `/api/*` except `/api/health` require `Authorization: Bearer <PRINTFORGE_TOKEN>`. Demo default token: `printforge-demo`. Token is kept in browser memory. JSON error: `{detail: string}` (validation errors may be arrays). GET `/api/health`: `{status:'ok',mode:'demo'|'live',version:'0.2.0'}`. GET `/api/state` returns the dashboard document below. UI polls every 5s.
 
 ```ts
 type Printer = {
@@ -25,6 +25,7 @@ type FarmState={mode:string;scheduler_enabled:boolean;printers:Printer[];jobs:Jo
 ```
 
 - POST `/api/printers`: printer config fields above excluding telemetry/id; optional `api_key`. Volume means XYZ mm. API returns saved Printer. All fields required except key and camera. New printer bed_clear always false regardless input.
+- POST `/api/printers/discover`: live mode only; `{moonraker_url, api_key?:string, name?:string}`. Verifies authenticated Moonraker access, reads advisory nozzle/travel/camera metadata, and returns a redacted Printer. New records are disabled with no spool or bed clearance. Unknown nozzle/dimensions are zero until reviewed. Existing URL matches preserve operator settings and update only verified credentials; reserved jobs prevent the update. Never enables scheduling.
 - PUT `/api/printers/{id}`: full editable config; optional api_key (empty keeps previous). Reject configuration changes while reserved; returns Printer. Non-fdm entries are inventory only.
 - POST `/api/printers/{id}/clear-bed`: requires fresh ready idle telemetry and no active/held job. Sets clearance; returns `{ok:true}`.
 - POST `/api/printers/{id}/control`: `{action:'pause'|'resume'|'cancel'}`; physical command to live printer; cancel retains job reservation pending telemetry. Returns `{ok:true}` or useful failure. No automatic cancel retries.

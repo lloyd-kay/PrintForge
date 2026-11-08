@@ -2,6 +2,12 @@
 
 This is an initial local MVP, not a hardware-qualified production release.
 
+## Native stack installer, v0.2.0
+
+The [Debian 13 CI run](https://github.com/lloyd-kay/PrintForge/actions/runs/42487274714) installed actual PrintForge and Spoolman services in a disposable systemd host, then repeated installation. It verified a real Spoolman database/write, preserved inventory and PrintForge credentials/listener, served both compiled interfaces, and registered an authenticated Moonraker connection with automatic printing disabled. Moonraker was a local HTTP/Unix-socket protocol fixture: its configuration was backed up and changed once, with exactly one restart request across installation and repeat installation. No physical printer was connected.
+
+Installer tests additionally exercise archive validation, protected paths, activation rollback, existing inventory conflicts, managed-service repair, included Moonraker configuration, unavailable/paused/active telemetry, changing configuration, credential redaction and idempotent discovery. Windows skips Linux-only shell/symlink cases; the Linux CI suite runs those cases. The upstream Starlette test-client deprecation warning remains non-failing.
+
 ## Automated checks
 
 - Backend: **26 tests passed** with Python 3.14.5. Covers authenticated API, real-mode isolation, exclusive process lock, upload validation, individual durable batch copies, profile/time/filament matching, shared-spool rejection, bed clearance, concurrent ticks, uncertain start, filename changes during upload, disconnects, restart recovery, conservative budget persistence and explicit reconciliation.

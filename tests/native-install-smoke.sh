@@ -117,6 +117,7 @@ PY
 
 # Omit listener overrides on the repeat run: existing settings must win.
 bash /release/install.sh --version v0.2.0 --archive /release/printforge-v0.2.0.tar.gz
+verify_persisted_stack() {
 test "$first_settings" = "$(sha256sum /etc/printforge/printforge.env)"
 test "$first_release" = "$(readlink /opt/printforge/current)"
 test "$first_spoolman_release" = "$(readlink /opt/printforge-spoolman/current)"
@@ -149,6 +150,7 @@ assert printers[0]['enabled'] is False and printers[0]['bed_clear'] is False
 assert state['scheduler_enabled'] is False and state['jobs'] == []
 assert 'ci-moonraker-api-key' not in json.dumps(state)
 assert all('api_key' not in printer for printer in state['printers'])
+assert request(env['SPOOLMAN_URL'] + '/api/v1/health')['status'] == 'healthy'
 spool = request(env['SPOOLMAN_URL'] + '/api/v1/spool/' + str(expected['spool_id']))
 assert spool['filament']['id'] == expected['filament_id']
 assert spool['filament']['name'] == 'Installer persistence check'
@@ -159,4 +161,15 @@ assert config == expected['moonraker_config'] and config.count('[spoolman]') == 
 fixture = json.loads(Path('/tmp/printforge-moonraker-fixture/state.json').read_text())
 assert fixture['restart_count'] == 1 and fixture['forbidden_actions'] == [], fixture
 PY
-echo 'Debian 13 native stack, authenticated discovery, Spoolman inventory, and repeat installation verified.'
+}
+verify_persisted_stack
+
+# Recovery must work with the local Spoolman URL already saved in the settings.
+systemctl stop printforge-spoolman
+if systemctl is-active --quiet printforge-spoolman; then
+    echo 'Spoolman did not stop for the managed-service recovery check.' >&2
+    exit 1
+fi
+bash /release/install.sh --version v0.2.0 --archive /release/printforge-v0.2.0.tar.gz
+verify_persisted_stack
+echo 'Debian 13 native stack, authenticated discovery, inventory preservation, repeat installation, and stopped-service recovery verified.'

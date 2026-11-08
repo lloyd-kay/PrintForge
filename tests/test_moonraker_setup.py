@@ -21,7 +21,7 @@ class Moonraker:
         self.data = data
         self.calls = []
         self.config = {"config": {"server": {"host": "0.0.0.0", "port": 7125}, "authorization": {"enable_api_key": True}},
-                       "orig": {"server": {}}, "files": [{"filename": "moonraker.conf", "sections": ["server"]}]}
+                       "orig": {"server": {"port": "7125"}}, "files": [{"filename": "moonraker.conf", "sections": ["server"]}]}
         self.status = {"webhooks": {"state": "ready"}, "print_stats": {"state": "standby"},
                        "virtual_sdcard": {"is_active": False}, "pause_resume": {"is_paused": False},
                        "idle_timeout": {"state": "Ready"}}
@@ -326,3 +326,54 @@ def test_ipv6_loopback_is_not_assumed_to_share_ipv4_inventory(tmp_path, setup_mo
     result = setup_module.configure_spoolman(instance, "http://[::1]:7912")
     assert "conflict" in result["reason"].lower() and not result["applied"]
     assert cfg.read_bytes() == before and host.restarts == 0
+
+
+@pytest.mark.parametrize("pending", [
+    "[server]\nport: not-a-port\n",
+    "[server]\nport: 7126\n",
+    "[server]\nport: 7125\n[authorization]\nenable_api_key: False\n",
+    "[DEFAULT]\nchanged: setting\n[server]\nport: 7125\n",
+])
+def test_unrelated_pending_configuration_defers_before_edit_or_restart(tmp_path, setup_module, pending):
+    host, instance, cfg = fixture_host(tmp_path, setup_module)
+    cfg.write_text(pending)
+    before = cfg.read_bytes()
+    result = setup_module.configure_spoolman(instance, "http://127.0.0.1:7912", sleep=lambda _: None)
+    assert result["pending_restart"] and not result["applied"] and not result["ready"]
+    assert "pending" in result["reason"].lower()
+    assert cfg.read_bytes() == before and host.restarts == 0
+    assert len(list(cfg.parent.iterdir())) == 1
+
+
+def test_unrelated_pending_edit_does_not_prevent_healthy_existing_reuse(tmp_path, setup_module):
+    host, instance, cfg = fixture_host(tmp_path, setup_module)
+    cfg.write_text("[server]\nport: not-a-port\n[spoolman]\nserver: http://127.0.0.1:7912\n")
+    host.config["orig"]["spoolman"] = {"server": "http://127.0.0.1:7912"}
+    host.connected = True
+    before = cfg.read_bytes()
+    result = setup_module.configure_spoolman(instance, "http://127.0.0.1:7912")
+    assert result["ready"] and not result["pending_restart"] and not result["applied"]
+    assert cfg.read_bytes() == before and host.restarts == 0
+
+
+def test_clean_include_defaults_and_comments_allow_activation(tmp_path, setup_module):
+    host, instance, cfg = fixture_host(tmp_path, setup_module)
+    cfg.write_text("[DEFAULT]\nshared: initial\n[server]\nport: 7125\n"
+                   "note: Printer \\#one # ignored comment\n[include extras/*.conf]\n"
+                   "[webcam main]\nenabled: True\n")
+    extras = cfg.parent / "extras"
+    extras.mkdir()
+    include = extras / "auth.conf"
+    include.write_text("[DEFAULT]\nshared: included\n[authorization]\nforce_logins: True\n"
+                       "cors_domains:\n  http://printer.lan # ignored comment\n")
+    host.config["orig"] = {
+        "DEFAULT": {"shared": "included"},
+        "server": {"shared": "included", "port": "7125", "note": "Printer #one"},
+        "authorization": {"shared": "included", "force_logins": "True", "cors_domains": "\nhttp://printer.lan"},
+        "webcam main": {"shared": "included", "enabled": "True"},
+    }
+    host.config["files"].append({"filename": "extras/auth.conf", "sections": ["DEFAULT", "authorization"]})
+    before = include.read_bytes()
+    result = setup_module.configure_spoolman(instance, "http://127.0.0.1:7912", sleep=lambda _: None)
+    assert result["ready"] and result["applied"] and host.restarts == 1
+    assert include.read_bytes() == before

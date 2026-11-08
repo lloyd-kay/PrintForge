@@ -328,7 +328,8 @@ def _url(value):
 
 def _read_tree(main):
     """Resolve includes in parse order; keep exact source bytes for safe updates."""
-    snapshots, merged, visited = {}, {}, set()
+    snapshots, visited = {}, set()
+    merged = configparser.ConfigParser(interpolation=None, strict=True)
     def visit(path, stack):
         path = path.resolve()
         if path in stack:
@@ -345,25 +346,54 @@ def _read_tree(main):
         raw = path.read_bytes()
         if len(raw) > 4 * 1024 * 1024:
             raise MoonrakerSetupError("Moonraker configuration is too large for automatic setup.")
-        parser = configparser.ConfigParser(interpolation=None, strict=True, inline_comment_prefixes=("#", ";"))
+        parser = configparser.ConfigParser(interpolation=None, strict=True)
         try:
-            parser.read_string(raw.decode("utf-8-sig"))
+            # Match Moonraker's preprocessing before ConfigParser sees values:
+            # tab width four, whitespace-delimited comments, escaped # and ;.
+            lines = []
+            for original in raw.decode("utf-8").splitlines():
+                if not original.strip() or original.lstrip().startswith(("#", ";")):
+                    continue
+                line = re.split(r" +[#;]", original.expandtabs(4), maxsplit=1)[0]
+                lines.append(re.sub(r" \\([#;])", r" \1", line))
+            # Validate duplicates across the entire individual source file,
+            # including sections on opposite sides of an include directive.
+            parser.read_string("\n".join(lines))
         except (ValueError, configparser.Error) as exc:
             raise MoonrakerSetupError(f"Cannot safely parse Moonraker configuration: {path.name}") from exc
         snapshots[path] = (raw, before_stat)
-        for section in parser.sections():
-            if section.startswith("include "):
-                pattern = section[8:].strip()
+        block, option_indent = [], -1
+        def flush():
+            if block:
+                try:
+                    merged.read_string("\n".join(block))
+                except configparser.Error as exc:
+                    raise MoonrakerSetupError(f"Cannot safely merge Moonraker configuration: {path.name}") from exc
+                block.clear()
+        for line in lines:
+            indent = len(line) - len(line.lstrip())
+            if option_indent >= 0 and indent > option_indent:
+                block.append(line)
+                continue
+            header = re.match(r"\s*\[([^]]+)\]", line)
+            if header:
+                option_indent = -1
+            else:
+                option_indent = indent
+            if header and header[1].startswith("include "):
+                pattern = header[1][8:].strip()
                 include = Path(pattern)
                 matches = sorted(include.parent.glob(include.name) if include.is_absolute() else path.parent.glob(pattern))
                 if not matches:
                     raise MoonrakerSetupError(f"Moonraker include is missing or unmatched: {pattern}")
+                flush()
                 for match in matches:
                     visit(Path(match), stack | {path})
             else:
-                merged.setdefault(section, {}).update(dict(parser[section]))
+                block.append(line)
+        flush()
     visit(main, set())
-    return merged, snapshots
+    return {section: dict(merged[section]) for section in merged}, snapshots
 
 
 def _configuration(instance):
@@ -388,11 +418,11 @@ def _configuration(instance):
         raise MoonrakerSetupError("Spoolman conflict: loaded and on-disk servers differ; preserve and review the existing configuration.")
     if loaded and not configured:
         raise MoonrakerSetupError("Loaded Spoolman configuration was removed on disk; review the pending change.")
-    return loaded, configured, snapshots
+    return loaded, configured, snapshots, disk, active["orig"]
 
 
 def inspect_spoolman(instance):
-    loaded, configured, _ = _configuration(instance)
+    loaded, configured, _, _, _ = _configuration(instance)
     section = configured or loaded
     return section["server"].strip() if section else None
 
@@ -414,6 +444,16 @@ def _require_idle(instance):
             or status.get("pause_resume", {}).get("is_paused") is not False
             or status.get("idle_timeout", {}).get("state") not in {"Idle", "Ready"}):
         raise MoonrakerSetupError("Activation pending: printer is active, paused, or its idle state is unknown. Retry after the printer is idle.")
+
+
+def _require_no_pending_changes(disk, active):
+    def unrelated(settings):
+        if any(not isinstance(options, dict) for options in settings.values()):
+            raise MoonrakerSetupError("Activation pending: original configuration is incomplete; review it before restarting.")
+        return {section: options for section, options in settings.items()
+                if section != "spoolman" and not (section == "DEFAULT" and not options)}
+    if unrelated(disk) != unrelated(active):
+        raise MoonrakerSetupError("Activation pending: unrelated Moonraker settings changed on disk. Review and activate those changes yourself before retrying Spoolman setup.")
 
 
 def _unchanged(snapshots):
@@ -450,7 +490,7 @@ def configure_spoolman(instance, url, *, sleep=time.sleep):
     result = {"applied": False, "ready": False, "pending_restart": False, "reason": ""}
     try:
         desired = _url(url)
-        loaded, configured, snapshots = _configuration(instance)
+        loaded, configured, snapshots, disk, active = _configuration(instance)
         existing = configured or loaded
         if existing and _url(existing["server"]) != desired:
             result["reason"] = "Spoolman conflict: preserving the existing server. Use that server or review the configuration manually."
@@ -463,6 +503,7 @@ def configure_spoolman(instance, url, *, sleep=time.sleep):
                                 else "Existing Spoolman configuration preserved; connection is not available yet.")
             return result
         result["pending_restart"] = True
+        _require_no_pending_changes(disk, active)
         _require_idle(instance)
         if not configured:
             _unchanged(snapshots)
